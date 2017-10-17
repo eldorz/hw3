@@ -16,11 +16,14 @@ REPLAY_SIZE = 10000  # experience replay buffer size
 BATCH_SIZE = 128  # size of minibatch (orig 128)
 TEST_FREQUENCY = 10  # How many episodes to run before visualizing test accuracy
 SAVE_FREQUENCY = 1000  # How many episodes to run before saving model (unused)
-NUM_EPISODES = 100  # Episode limitation
-EP_MAX_STEPS = 200  # Step limitation in an episode
+NUM_EPISODES = 100000  # Episode limitation
+EP_MAX_STEPS = 100000  # Step limitation in an episode
 # The number of test iters (with epsilon set to 0) to run every TEST_FREQUENCY episodes
 NUM_TEST_EPS = 4
 HIDDEN_NODES = 128
+
+# continuous action space
+DISCRETE_ACTIONS = 20
 
 
 def init(env, env_name):
@@ -43,12 +46,24 @@ def init(env, env_name):
     might help in using the same code for discrete and (discretised) continuous
     action spaces
     """
-    global replay_buffer, epsilon
+    global replay_buffer, epsilon, iscontinuous, action_map
     replay_buffer = []
     epsilon = INITIAL_EPSILON
 
+    if isinstance(env.action_space, gym.spaces.Discrete):
+        iscontinuous = False
+        action_dim = env.action_space.n
+    else:
+        iscontinuous = True
+        lower_bound = env.action_space.low[0]
+        upper_bound = env.action_space.high[0]
+        interval = (upper_bound - lower_bound) / (DISCRETE_ACTIONS - 1)
+        action_map = {}
+        for i in range(DISCRETE_ACTIONS):
+            action_map[i] = lower_bound + i * interval
+        action_dim = DISCRETE_ACTIONS
+
     state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
     return state_dim, action_dim
 
 def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
@@ -129,7 +144,10 @@ def get_env_action(action):
     Modify for continous action spaces that you have discretised, see hints in
     `init()`
     """
-    return action
+    if iscontinuous == True:
+        return np.array([action_map[action]])
+    else:
+        return action
 
 
 def update_replay_buffer(replay_buffer, state, action, reward, next_state, done,
