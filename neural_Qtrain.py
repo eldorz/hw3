@@ -16,7 +16,7 @@ REPLAY_SIZE = 10000  # experience replay buffer size
 BATCH_SIZE = 128  # size of minibatch (orig 128)
 TEST_FREQUENCY = 10  # How many episodes to run before visualizing test accuracy
 SAVE_FREQUENCY = 1000  # How many episodes to run before saving model (unused)
-NUM_EPISODES = 100  # Episode limitation
+NUM_EPISODES = 1000  # Episode limitation
 EP_MAX_STEPS = 200  # Step limitation in an episode
 # The number of test iters (with epsilon set to 0) to run every TEST_FREQUENCY episodes
 NUM_TEST_EPS = 4
@@ -261,6 +261,12 @@ def qtrain(env, state_dim, action_dim,
 
             if done:
                 break
+
+        # tensorboard that reward
+        summary = tf.Summary()
+        summary.value.add(tag = "reward", simple_value = ep_reward)
+        writer.add_summary(summary, batch_presentations_count)
+        
         total_reward += ep_reward
         test_or_train = "test" if test_mode else "train"
         print("end {0} episode {1}, ep reward: {2}, ave reward: {3}, \
@@ -285,8 +291,9 @@ def setup():
 
 def main():
     env, state_dim, action_dim, network_vars = setup()
-    qtrain(env, state_dim, action_dim, *network_vars, render=True)
 
+    #TODO change to render=True
+    qtrain(env, state_dim, action_dim, *network_vars, render=False)
 
 if __name__ == "__main__":
     main()

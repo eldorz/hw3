@@ -16,14 +16,17 @@ REPLAY_SIZE = 10000  # experience replay buffer size
 BATCH_SIZE = 128  # size of minibatch (orig 128)
 TEST_FREQUENCY = 10  # How many episodes to run before visualizing test accuracy
 SAVE_FREQUENCY = 1000  # How many episodes to run before saving model (unused)
-NUM_EPISODES = 100000  # Episode limitation
-EP_MAX_STEPS = 100000  # Step limitation in an episode
+NUM_EPISODES = 1000  # Episode limitation
+EP_MAX_STEPS = 200  # Step limitation in an episode
 # The number of test iters (with epsilon set to 0) to run every TEST_FREQUENCY episodes
 NUM_TEST_EPS = 4
 HIDDEN_NODES = 128
 
 # continuous action space
 DISCRETE_ACTIONS = 20
+
+# double q learning
+COPY_TO_TARGET_INTERVAL = 16
 
 
 def init(env, env_name):
@@ -107,6 +110,15 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
         activation = None, 
         name = "q_network_output_layer")
 
+    # target network
+    target_layer_one_out = tf.layers.dense(state_in, hidden_nodes,
+        activation = tf.nn.relu, name = "target_network_hidden_layer_1")
+    target_layer_two_out = tf.layers.dense(target_layer_one_out, hidden_nodes,
+        activation = tf.nn.relu, name = "target_network_hidden_layer_2")
+    global target_q_values
+    target_q_values = tf.layers.dense(target_layer_two_out, action_dim,
+        activation = None, name = "target_network_output_layer")
+
     q_selected_action = \
         tf.reduce_sum(tf.multiply(q_values, action_in), reduction_indices=1)
 
@@ -114,6 +126,18 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     optimise_step = tf.train.AdamOptimizer().minimize(loss)
 
     train_loss_summary_op = tf.summary.scalar("TrainingLoss", loss)
+    
+    # define op to copy q network to target network
+    q_vars = [v for v in tf.global_variables() if "q_network" in v.name and
+        "Adam" not in v.name]
+    target_vars = [v for v in tf.global_variables() 
+        if "target_network" in v.name]
+    assign_ops = []
+    for i in range(len(q_vars)):
+        assign_ops.append(target_vars[i].assign(q_vars[i]))
+    global copy_op, equal_op
+    copy_op = tf.group(*assign_ops)
+
     return state_in, action_in, target_in, q_values, q_selected_action, \
            loss, optimise_step, train_loss_summary_op
 
@@ -211,7 +235,7 @@ def get_train_batch(q_values, state_in, minibatch):
     next_state_batch = [data[3] for data in minibatch]
 
     target_batch = []
-    Q_value_batch = q_values.eval(feed_dict={
+    Q_value_batch = target_q_values.eval(feed_dict={
         state_in: next_state_batch
     })
     for i in range(0, BATCH_SIZE):
@@ -255,6 +279,10 @@ def qtrain(env, state_dim, action_dim,
         for step in range(ep_max_steps):
             total_steps += 1
 
+            # copy q network to target network at set interval
+            if step % COPY_TO_TARGET_INTERVAL == 0:
+                session.run(copy_op)
+
             # get an action and take a step in the environment
             action = get_action(state, state_in, q_values, epsilon, test_mode,
                                 action_dim)
@@ -279,6 +307,12 @@ def qtrain(env, state_dim, action_dim,
 
             if done:
                 break
+
+        # tensorboard that reward
+        summary = tf.Summary()
+        summary.value.add(tag = "reward", simple_value = ep_reward)
+        writer.add_summary(summary, batch_presentations_count)
+        
         total_reward += ep_reward
         test_or_train = "test" if test_mode else "train"
         print("end {0} episode {1}, ep reward: {2}, ave reward: {3}, \
@@ -303,7 +337,9 @@ def setup():
 
 def main():
     env, state_dim, action_dim, network_vars = setup()
-    qtrain(env, state_dim, action_dim, *network_vars, render=True)
+
+    #TODO change to render=True
+    qtrain(env, state_dim, action_dim, *network_vars, render=False)
 
 
 if __name__ == "__main__":
