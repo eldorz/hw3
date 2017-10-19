@@ -26,7 +26,7 @@ HIDDEN_NODES = 128
 DISCRETE_ACTIONS = 20
 
 # double q learning
-COPY_TO_TARGET_INTERVAL = 16
+COPY_TO_TARGET_INTERVAL = 1000
 
 
 def init(env, env_name):
@@ -112,12 +112,15 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
 
     # target network
     target_layer_one_out = tf.layers.dense(state_in, hidden_nodes,
-        activation = tf.nn.relu, name = "target_network_hidden_layer_1")
+        activation = tf.nn.relu, name = "target_network_hidden_layer_1",
+        trainable = False)
     target_layer_two_out = tf.layers.dense(target_layer_one_out, hidden_nodes,
-        activation = tf.nn.relu, name = "target_network_hidden_layer_2")
+        activation = tf.nn.relu, name = "target_network_hidden_layer_2",
+        trainable = False)
     global target_q_values
     target_q_values = tf.layers.dense(target_layer_two_out, action_dim,
-        activation = None, name = "target_network_output_layer")
+        activation = None, name = "target_network_output_layer",
+        trainable = False)
 
     q_selected_action = \
         tf.reduce_sum(tf.multiply(q_values, action_in), reduction_indices=1)
@@ -126,6 +129,12 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     optimise_step = tf.train.AdamOptimizer().minimize(loss)
 
     train_loss_summary_op = tf.summary.scalar("TrainingLoss", loss)
+    q_histograms = [tf.summary.histogram(var.op.name, var) for
+        var in tf.trainable_variables()]
+    target_histograms = [tf.summary.histogram(var.op.name, var) for
+        var in tf.global_variables() if "target_network" in var.name]
+    train_loss_summary_op = tf.summary.merge(
+        [train_loss_summary_op, q_histograms, target_histograms])
     
     # define op to copy q network to target network
     q_vars = [v for v in tf.global_variables() if "q_network" in v.name and
@@ -135,7 +144,7 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     assign_ops = []
     for i in range(len(q_vars)):
         assign_ops.append(target_vars[i].assign(q_vars[i]))
-    global copy_op, equal_op
+    global copy_op
     copy_op = tf.group(*assign_ops)
 
     return state_in, action_in, target_in, q_values, q_selected_action, \
@@ -280,7 +289,7 @@ def qtrain(env, state_dim, action_dim,
             total_steps += 1
 
             # copy q network to target network at set interval
-            if step % COPY_TO_TARGET_INTERVAL == 0:
+            if batch_presentations_count % COPY_TO_TARGET_INTERVAL == 0:
                 session.run(copy_op)
 
             # get an action and take a step in the environment
@@ -312,7 +321,7 @@ def qtrain(env, state_dim, action_dim,
         summary = tf.Summary()
         summary.value.add(tag = "reward", simple_value = ep_reward)
         writer.add_summary(summary, batch_presentations_count)
-        
+
         total_reward += ep_reward
         test_or_train = "test" if test_mode else "train"
         print("end {0} episode {1}, ep reward: {2}, ave reward: {3}, \
@@ -338,8 +347,7 @@ def setup():
 def main():
     env, state_dim, action_dim, network_vars = setup()
 
-    #TODO change to render=True
-    qtrain(env, state_dim, action_dim, *network_vars, render=False)
+    qtrain(env, state_dim, action_dim, *network_vars, render=True)
 
 
 if __name__ == "__main__":
