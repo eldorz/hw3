@@ -26,7 +26,7 @@ HIDDEN_NODES = 128
 DISCRETE_ACTIONS = 20
 
 # double q learning
-COPY_TO_TARGET_INTERVAL = 1000
+COPY_TO_TARGET_INTERVAL = 4
 
 
 def init(env, env_name):
@@ -347,7 +347,8 @@ def setup():
 def main():
     env, state_dim, action_dim, network_vars = setup()
 
-    qtrain(env, state_dim, action_dim, *network_vars, render=True)
+    #TODO change back to render=True
+    qtrain(env, state_dim, action_dim, *network_vars, render=False)
 
 
 if __name__ == "__main__":
