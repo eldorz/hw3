@@ -22,6 +22,9 @@ EP_MAX_STEPS = 200  # Step limitation in an episode
 NUM_TEST_EPS = 4
 HIDDEN_NODES = 128
 
+# regularisation
+L2_BETA = 0.01
+
 # continuous action space
 DISCRETE_ACTIONS = 20
 
@@ -125,7 +128,10 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     q_selected_action = \
         tf.reduce_sum(tf.multiply(q_values, action_in), reduction_indices=1)
 
-    loss = tf.reduce_mean(tf.square(target_in - q_selected_action))
+
+    l2 = L2_BETA * sum(tf.nn.l2_loss(tf_var)
+        for tf_var in tf.trainable_variables() if not ("Bias" in tf_var.name))
+    loss = tf.reduce_mean(tf.square(target_in - q_selected_action)) + l2
     optimise_step = tf.train.AdamOptimizer().minimize(loss)
 
     train_loss_summary_op = tf.summary.scalar("TrainingLoss", loss)
