@@ -8,12 +8,12 @@ import datetime
 """
 Hyper Parameters
 """
-GAMMA = 0.90  # discount factor for target Q
+GAMMA = 0.99  # discount factor for target Q
 INITIAL_EPSILON = 0.6  # starting value of epsilon
 FINAL_EPSILON = 0.1  # final value of epsilon
 EPSILON_DECAY_STEPS = 100
 REPLAY_SIZE = 10000  # experience replay buffer size
-BATCH_SIZE = 128  # size of minibatch (orig 128)
+BATCH_SIZE = 256  # size of minibatch (orig 128)
 TEST_FREQUENCY = 10  # How many episodes to run before visualizing test accuracy
 SAVE_FREQUENCY = 1000  # How many episodes to run before saving model (unused)
 NUM_EPISODES = 1000  # Episode limitation
