@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import random
 import datetime
+from collections import deque
 
 """
 Hyper Parameters
@@ -23,7 +24,7 @@ NUM_TEST_EPS = 4
 HIDDEN_NODES = 128
 
 # regularisation
-L2_BETA = 0.01
+L2_BETA = 0.001
 
 # continuous action space
 DISCRETE_ACTIONS = 20
@@ -130,7 +131,7 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
 
 
     l2 = L2_BETA * sum(tf.nn.l2_loss(tf_var)
-        for tf_var in tf.trainable_variables() if not ("Bias" in tf_var.name))
+        for tf_var in tf.trainable_variables() if not ("bias" in tf_var.name))
     loss = tf.reduce_mean(tf.square(target_in - q_selected_action)) + l2
     optimise_step = tf.train.AdamOptimizer().minimize(loss)
 
@@ -274,6 +275,8 @@ def qtrain(env, state_dim, action_dim,
     # Record the number of times we do a training batch, take a step, and
     # the total_reward across all eps
     batch_presentations_count = total_steps = total_reward = 0
+    best_last_100_av = -1000
+    last_100 = deque()
 
     for episode in range(num_episodes):
         # initialize task
@@ -323,17 +326,26 @@ def qtrain(env, state_dim, action_dim,
             if done:
                 break
 
+        last_100.append(ep_reward)
+        if (len(last_100) > 100):
+            last_100.popleft()
+        last_100_average = np.average(last_100)
+        if last_100_average > best_last_100_av:
+            best_last_100_av = last_100_average
         # tensorboard that reward
         summary = tf.Summary()
         summary.value.add(tag = "reward", simple_value = ep_reward)
+        summary.value.add(tag = "100_average", simple_value = last_100_average)
         writer.add_summary(summary, batch_presentations_count)
 
         total_reward += ep_reward
         test_or_train = "test" if test_mode else "train"
         print("end {0} episode {1}, ep reward: {2}, ave reward: {3}, \
-            Batch presentations: {4}, epsilon: {5}".format(
+            Batch presentations: {4}, epsilon: {5}, last 100 av: {6}, \
+            best moving av {7}".format(
             test_or_train, episode, ep_reward, total_reward / (episode + 1),
-            batch_presentations_count, epsilon
+            batch_presentations_count, epsilon, last_100_average, 
+            best_last_100_av
         ))
 
 
@@ -354,7 +366,7 @@ def main():
     env, state_dim, action_dim, network_vars = setup()
 
     #TODO change back to render=True
-    qtrain(env, state_dim, action_dim, *network_vars, render=False)
+    qtrain(env, state_dim, action_dim, *network_vars, render=True)
 
 
 if __name__ == "__main__":
