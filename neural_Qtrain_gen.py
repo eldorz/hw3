@@ -10,7 +10,7 @@ from collections import deque
 Hyper Parameters
 """
 GAMMA = 0.99  # discount factor for target Q
-INITIAL_EPSILON = 0.6  # starting value of epsilon
+INITIAL_EPSILON = 1.0  # starting value of epsilon
 FINAL_EPSILON = 0.1  # final value of epsilon
 EPSILON_DECAY_STEPS = 100
 REPLAY_SIZE = 10000  # experience replay buffer size
