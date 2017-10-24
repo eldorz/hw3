@@ -9,7 +9,9 @@ from collections import deque
 """
 Hyper Parameters
 """
-GAMMA = 0.99  # discount factor for target Q
+INITIAL_GAMMA = 0.90  # discount factor for target Q
+FINAL_GAMMA = 0.99
+GAMMA_CHANGE_FACTOR = 0.98
 INITIAL_EPSILON = 0.6  # starting value of epsilon
 FINAL_EPSILON = 0.1  # final value of epsilon
 EPSILON_DECAY_STEPS = 100
@@ -32,6 +34,8 @@ DISCRETE_ACTIONS = 20
 # double q learning
 COPY_TO_TARGET_INTERVAL = 4
 
+# global variables
+gamma = INITIAL_GAMMA
 
 def init(env, env_name):
     """
@@ -251,7 +255,7 @@ def get_train_batch(q_values, state_in, minibatch):
         if sample_is_done:
             target_batch.append(reward_batch[i])
         else:
-            target_val = reward_batch[i] + GAMMA * np.max(Q_value_batch[i])
+            target_val = reward_batch[i] + gamma * np.max(Q_value_batch[i])
             target_batch.append(target_val)
     return target_batch, state_batch, action_batch
 
@@ -264,16 +268,23 @@ def qtrain(env, state_dim, action_dim,
            final_epsilon=FINAL_EPSILON, epsilon_decay_steps=EPSILON_DECAY_STEPS,
            force_test_mode=False, render=True):
     global epsilon
+
     # Record the number of times we do a training batch, take a step, and
     # the total_reward across all eps
     batch_presentations_count = total_steps = total_reward = 0
     best_last_100_av = -10000
     last_100 = deque()
 
+    gamma = INITIAL_GAMMA
+
     for episode in range(num_episodes):
         # initialize task
         state = env.reset()
         if render: env.render()
+
+        # vary gamma, increase as training progresses, per Francois-Lavet et al
+        if gamma < FINAL_GAMMA:
+            gamma = 1 - GAMMA_CHANGE_FACTOR * (1 - gamma)
 
         # Update epsilon once per episode - exp decaying
         epsilon -= (epsilon - final_epsilon) / epsilon_decay_steps
@@ -328,16 +339,17 @@ def qtrain(env, state_dim, action_dim,
         summary = tf.Summary()
         summary.value.add(tag = "reward", simple_value = ep_reward)
         summary.value.add(tag = "100_average", simple_value = last_100_average)
+        summary.value.add(tag = "gamma", simple_value = gamma)
         writer.add_summary(summary, batch_presentations_count)
 
         total_reward += ep_reward
         test_or_train = "test" if test_mode else "train"
         print("end {0} episode {1}, ep reward: {2}, ave reward: {3}, \
             Batch presentations: {4}, epsilon: {5}, last 100 av: {6}, \
-            best moving av {7}".format(
+            best moving av {7}, gamma {8}".format(
             test_or_train, episode, ep_reward, total_reward / (episode + 1),
             batch_presentations_count, epsilon, last_100_average, 
-            best_last_100_av
+            best_last_100_av, gamma
         ))
 
 
