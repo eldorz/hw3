@@ -13,7 +13,7 @@ INITIAL_EPSILON = 0.6  # starting value of epsilon
 FINAL_EPSILON = 0.1  # final value of epsilon
 EPSILON_DECAY_STEPS = 100
 REPLAY_SIZE = 10000  # experience replay buffer size
-BATCH_SIZE = 128  # size of minibatch (orig 128)
+BATCH_SIZE = 256  # size of minibatch (orig 128)
 TEST_FREQUENCY = 10  # How many episodes to run before visualizing test accuracy
 SAVE_FREQUENCY = 1000  # How many episodes to run before saving model (unused)
 NUM_EPISODES = 1000  # Episode limitation
@@ -21,6 +21,9 @@ EP_MAX_STEPS = 200  # Step limitation in an episode
 # The number of test iters (with epsilon set to 0) to run every TEST_FREQUENCY episodes
 NUM_TEST_EPS = 4
 HIDDEN_NODES = 128
+
+# regularisation
+L2_BETA = 0.01
 
 
 def init(env, env_name):
@@ -73,21 +76,13 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     # the network's estimation of the Q values for those actions and the input 
     # state. The final layer should be assigned to the variable q_values
     
-    # n hidden layers, fully connected
+    # two hidden layers, fully connected
     layer_one_out = tf.layers.dense(state_in, hidden_nodes, 
         activation = tf.nn.relu, 
         name = "q_network_hidden_layer_1")
     layer_two_out = tf.layers.dense(layer_one_out, hidden_nodes,
         activation = tf.nn.relu,
         name = "q_network_hidden_layer_2")
-    '''
-    layer_three_out = tf.layers.dense(layer_two_out, hidden_nodes, 
-        activation = tf.nn.relu, 
-        name = "q_network_hidden_layer_3")
-    layer_four_out = tf.layers.dense(layer_three_out, hidden_nodes,
-        activation = tf.nn.relu,
-        name = "q_network_hidden_layer_4")
-    '''
     q_values = tf.layers.dense(layer_two_out, action_dim,
         activation = None, 
         name = "q_network_output_layer")
@@ -95,7 +90,11 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     q_selected_action = \
         tf.reduce_sum(tf.multiply(q_values, action_in), reduction_indices=1)
 
-    loss = tf.reduce_mean(tf.square(target_in - q_selected_action))
+    # L2 regularisation
+    l2 = L2_BETA * sum(tf.nn.l2_loss(tf_var)
+        for tf_var in tf.trainable_variables() if not ("bias" in tf_var.name))
+
+    loss = tf.reduce_mean(tf.square(target_in - q_selected_action)) + l2
     optimise_step = tf.train.AdamOptimizer().minimize(loss)
 
     train_loss_summary_op = tf.summary.scalar("TrainingLoss", loss)
@@ -266,7 +265,7 @@ def qtrain(env, state_dim, action_dim,
         summary = tf.Summary()
         summary.value.add(tag = "reward", simple_value = ep_reward)
         writer.add_summary(summary, batch_presentations_count)
-        
+
         total_reward += ep_reward
         test_or_train = "test" if test_mode else "train"
         print("end {0} episode {1}, ep reward: {2}, ave reward: {3}, \
@@ -292,8 +291,7 @@ def setup():
 def main():
     env, state_dim, action_dim, network_vars = setup()
 
-    #TODO change to render=True
-    qtrain(env, state_dim, action_dim, *network_vars, render=False)
+    qtrain(env, state_dim, action_dim, *network_vars, render=True)
 
 if __name__ == "__main__":
     main()

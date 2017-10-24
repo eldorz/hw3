@@ -18,7 +18,7 @@ BATCH_SIZE = 256  # size of minibatch (orig 128)
 TEST_FREQUENCY = 10  # How many episodes to run before visualizing test accuracy
 SAVE_FREQUENCY = 1000  # How many episodes to run before saving model (unused)
 NUM_EPISODES = 1000  # Episode limitation
-EP_MAX_STEPS = 200  # Step limitation in an episode
+EP_MAX_STEPS = 1000  # Step limitation in an episode
 # The number of test iters (with epsilon set to 0) to run every TEST_FREQUENCY episodes
 NUM_TEST_EPS = 4
 HIDDEN_NODES = 128
@@ -95,26 +95,18 @@ def get_network(state_dim, action_dim, hidden_nodes=HIDDEN_NODES):
     # the network's estimation of the Q values for those actions and the input 
     # state. The final layer should be assigned to the variable q_values
     
-    # n hidden layers, fully connected
+    # two hidden layers, fully connected
     layer_one_out = tf.layers.dense(state_in, hidden_nodes, 
         activation = tf.nn.relu, 
         name = "q_network_hidden_layer_1")
     layer_two_out = tf.layers.dense(layer_one_out, hidden_nodes,
         activation = tf.nn.relu,
         name = "q_network_hidden_layer_2")
-    '''
-    layer_three_out = tf.layers.dense(layer_two_out, hidden_nodes, 
-        activation = tf.nn.relu, 
-        name = "q_network_hidden_layer_3")
-    layer_four_out = tf.layers.dense(layer_three_out, hidden_nodes,
-        activation = tf.nn.relu,
-        name = "q_network_hidden_layer_4")
-    '''
     q_values = tf.layers.dense(layer_two_out, action_dim,
         activation = None, 
         name = "q_network_output_layer")
 
-    # target network
+    # target network, same as above, not trainable
     target_layer_one_out = tf.layers.dense(state_in, hidden_nodes,
         activation = tf.nn.relu, name = "target_network_hidden_layer_1",
         trainable = False)
@@ -275,7 +267,7 @@ def qtrain(env, state_dim, action_dim,
     # Record the number of times we do a training batch, take a step, and
     # the total_reward across all eps
     batch_presentations_count = total_steps = total_reward = 0
-    best_last_100_av = -1000
+    best_last_100_av = -10000
     last_100 = deque()
 
     for episode in range(num_episodes):
@@ -366,7 +358,7 @@ def main():
     env, state_dim, action_dim, network_vars = setup()
 
     #TODO change back to render=True
-    qtrain(env, state_dim, action_dim, *network_vars, render=True)
+    qtrain(env, state_dim, action_dim, *network_vars, render=False)
 
 
 if __name__ == "__main__":
