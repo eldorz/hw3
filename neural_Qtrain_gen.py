@@ -9,10 +9,10 @@ from collections import deque
 """
 Hyper Parameters
 """
-INITIAL_GAMMA = 0.90  # discount factor for target Q
+INITIAL_GAMMA = 0.99  # discount factor for target Q
 FINAL_GAMMA = 0.99
 GAMMA_CHANGE_FACTOR = 0.98
-INITIAL_EPSILON = 0.6  # starting value of epsilon
+INITIAL_EPSILON = 1.0  # starting value of epsilon
 FINAL_EPSILON = 0.1  # final value of epsilon
 EPSILON_DECAY_STEPS = 100
 REPLAY_SIZE = 10000  # experience replay buffer size
@@ -34,8 +34,6 @@ DISCRETE_ACTIONS = 20
 # double q learning
 COPY_TO_TARGET_INTERVAL = 4
 
-# global variables
-gamma = INITIAL_GAMMA
 
 def init(env, env_name):
     """
@@ -57,7 +55,8 @@ def init(env, env_name):
     might help in using the same code for discrete and (discretised) continuous
     action spaces
     """
-    global replay_buffer, epsilon, iscontinuous, action_map
+    global replay_buffer, epsilon, iscontinuous, action_map, gamma
+    gamma = INITIAL_GAMMA
     replay_buffer = []
     epsilon = INITIAL_EPSILON
 
